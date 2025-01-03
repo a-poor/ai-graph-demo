@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-
 # Connect to the local database
 DB_DIR = "./demo.db"
 if os.path.exists(DB_DIR):
@@ -18,23 +17,22 @@ conn = kuzu.Connection(db)
 
 # Create the tables
 NODE_CREATES = [
-    "CREATE NODE TABLE IF NOT EXISTS Person(name STRING, PRIMARY KEY (name));",
-    "CREATE NODE TABLE IF NOT EXISTS Pet(name STRING, PRIMARY KEY (name));",
-    "CREATE NODE TABLE IF NOT EXISTS Company(name STRING, PRIMARY KEY (name));",
-    "CREATE NODE TABLE IF NOT EXISTS Education(name STRING, PRIMARY KEY (name));",
-    "CREATE NODE TABLE IF NOT EXISTS Location(name STRING, PRIMARY KEY (name));",
-    "CREATE NODE TABLE IF NOT EXISTS Event(name STRING, PRIMARY KEY (name));",
+  "CREATE NODE TABLE IF NOT EXISTS Person(name STRING, PRIMARY KEY (name));",
+  "CREATE NODE TABLE IF NOT EXISTS Pet(name STRING, PRIMARY KEY (name));",
+  "CREATE NODE TABLE IF NOT EXISTS Organization(name STRING, PRIMARY KEY (name));",
+  "CREATE NODE TABLE IF NOT EXISTS Location(name STRING, PRIMARY KEY (name));",
+  "CREATE NODE TABLE IF NOT EXISTS Event(name STRING, PRIMARY KEY (name));",
 ]
 
 # Create the relationships
 REL_CREATES = [
-    "CREATE REL TABLE IF NOT EXISTS WORKS_AT(FROM Person TO Company);",
-    "CREATE REL TABLE IF NOT EXISTS LIVES_IN(FROM Person TO Location);",
-    "CREATE REL TABLE IF NOT EXISTS OWNS(FROM Person TO Pet);",
-    "CREATE REL TABLE IF NOT EXISTS FRIENDS_WITH(FROM Person TO Person);",
-    "CREATE REL TABLE IF NOT EXISTS RELATED_TO(FROM Person TO Person);",
-    "CREATE REL TABLE IF NOT EXISTS GRADUATED_FROM(FROM Person TO Education);",
-    "CREATE REL TABLE IF NOT EXISTS ATTENDED(FROM Person TO Event);",
+  "CREATE REL TABLE IF NOT EXISTS WORKS_AT(FROM Person TO Organization);",
+  "CREATE REL TABLE IF NOT EXISTS LIVES_IN(FROM Person TO Location);",
+  "CREATE REL TABLE IF NOT EXISTS OWNS(FROM Person TO Pet);",
+  "CREATE REL TABLE IF NOT EXISTS FRIENDS_WITH(FROM Person TO Person);",
+  "CREATE REL TABLE IF NOT EXISTS RELATED_TO(FROM Person TO Person);",
+  "CREATE REL TABLE IF NOT EXISTS GRADUATED_FROM(FROM Person TO Organization);",
+  "CREATE REL TABLE IF NOT EXISTS ATTENDED(FROM Person TO Event);",
 ]
 
 # Run the setup queries
@@ -43,21 +41,21 @@ for query in NODE_CREATES + REL_CREATES:
 
 # Define the "story"
 STORY = [
-    "I'm Alex Chen, a software architect at DataFlow Systems in Seattle.",
-    "I've been working there since 2020, where I lead the cloud infrastructure team.",
-    "I live in the Ballard neighborhood with my golden retriever, Max, who I adopted three years ago.",
-    "At DataFlow, I work closely with Sarah Kim, our lead data scientist.",
-    "She's brilliant with machine learning models and has been with the company for five years.",
-    "Sarah's younger brother, James Kim, actually works at our competitor, CloudScale Tech, as a product manager in their enterprise division.",
-    "Sarah and I collaborated on Project Phoenix last year with Marcus Rodriguez, a solutions architect who joined us from Microsoft.",
-    "Marcus still mentors his former intern, Emily Patel, who's now a rising star at Stripe leading their payment authentication systems.",
-    "I met my best friend Jordan Taylor at the University of Washington while getting my Master's in Computer Science.",
-    "Jordan now runs a successful gaming startup, PixelForge Interactive, which they founded with their spouse, Dr. Sam Taylor, who teaches game design at DigiTech Institute.",
-    "Last month, I spoke at the PNW Tech Summit, where I reconnected with my old colleague Priya Sharma.",
-    "She's now the CTO at GreenLeaf Solutions, an environmental technology company.",
-    "She's building out their sustainability tracking platform with Chris Martinez, who previously worked on LEED certification systems at the Green Building Council.",
-    "Chris's daughter, Maya Martinez, interned at DataFlow last summer and is now finishing her Computer Engineering degree at Stanford.",
-    "She's part of the same robotics research lab where my cousin, Dr. David Chen, serves as faculty advisor.",
+  "I'm Alex Chen, a software architect at DataFlow Systems in Seattle.",
+  "I've been working there since 2020, where I lead the cloud infrastructure team.",
+  "I live in the Ballard neighborhood with my golden retriever, Max, who I adopted three years ago.",
+  "At DataFlow, I work closely with Sarah Kim, our lead data scientist.",
+  "She's brilliant with machine learning models and has been with the company for five years.",
+  "Sarah's younger brother, James Kim, actually works at our competitor, CloudScale Tech, as a product manager in their enterprise division.",
+  "Sarah and I collaborated on Project Phoenix last year with Marcus Rodriguez, a solutions architect who joined us from Microsoft.",
+  "Marcus still mentors his former intern, Emily Patel, who's now a rising star at Stripe leading their payment authentication systems.",
+  "I met my best friend Jordan Taylor at the University of Washington while getting my Master's in Computer Science.",
+  "Jordan now runs a successful gaming startup, PixelForge Interactive, which they founded with their spouse, Dr. Sam Taylor, who teaches game design at DigiTech Institute.",
+  "Last month, I spoke at the PNW Tech Summit, where I reconnected with my old colleague Priya Sharma.",
+  "She's now the CTO at GreenLeaf Solutions, an environmental technology company.",
+  "She's building out their sustainability tracking platform with Chris Martinez, who previously worked on LEED certification systems at the Green Building Council.",
+  "Chris's daughter, Maya Martinez, interned at DataFlow last summer and is now finishing her Computer Engineering degree at Stanford.",
+  "She's part of the same robotics research lab where my cousin, Dr. David Chen, serves as faculty advisor.",
 ]
 
 
@@ -68,33 +66,33 @@ client = OpenAI(
 
 # Define the "tools"
 tools: list[ChatCompletionToolParam] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "run_queries",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "queries": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                        },
-                    },
-                },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_queries",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "string",
             },
+          },
         },
+      },
     },
+  },
 ]
 
 # Define the starting system prompt
 messages: list[ChatCompletionMessageParam] = [
-    {
-        "role": "developer",
-        "content": [
-            {
-                "type": "text",
-                "text": (
+  {
+    "role": "developer",
+    "content": [
+      {
+        "type": "text",
+        "text": (
 """
 Your job is to read input from the user and use that informatio to populate
 a graph database with the information you hear. You have access to a function
@@ -117,17 +115,17 @@ CREATE (p1)-[:FRIENDS_WITH]->(p2);
 ```
 
 If you hear "John Doe works at Main St Hardware", and you've already created
-a "Person" node for "John Doe", then you would first create the "Company" node:
+a "Person" node for "John Doe", then you would first create the "Organization" node:
 
 ```
-CREATE (c:Company {name: 'Main St Hardware'});
+CREATE (o:Organization {name: 'Main St Hardware'});
 ```
 
 
 And then create the relationship, with the following query:
 
 ```
-MATCH (p:Person), (c:Company)
+MATCH (p:Person), (o:Organization)
 WHERE p.name = 'John Doe' AND c.name = 'Main St Hardware'
 CREATE (p)-[:WORKS_AT]->(c);
 ```
@@ -150,7 +148,7 @@ For reference, the following has already been run:
 ```
 
 Remember to use the correct node and relationship types. For example, if you're
-connecting a person to a company, you should use the `Person` and `Company`
+connecting a person to a company, you should use the `Person` and `Organization`
 node types, and the `WORKS_AT` relationship type. If you're connecting a person
 to another person, you should use the `Person` node type and either the
 `FRIENDS_WITH` or `RELATED_TO` relationship types. If the relationship wasn't
@@ -176,10 +174,10 @@ be unique). It is also required when creating a relationship between two nodes
 
 Please only run queries -- the user won't be able to respond to you.
 """
-                ),
-            },
-        ],
-    },
+        ),
+      },
+    ],
+  },
 ]
 
 # Start running!
