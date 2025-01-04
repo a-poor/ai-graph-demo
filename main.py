@@ -15,29 +15,6 @@ if os.path.exists(DB_DIR):
 db = kuzu.Database(DB_DIR)
 conn = kuzu.Connection(db)
 
-# Create the tables
-NODE_CREATES = [
-  "CREATE NODE TABLE IF NOT EXISTS Person(name STRING, PRIMARY KEY (name));",
-  "CREATE NODE TABLE IF NOT EXISTS Pet(name STRING, PRIMARY KEY (name));",
-  "CREATE NODE TABLE IF NOT EXISTS Organization(name STRING, PRIMARY KEY (name));",
-  "CREATE NODE TABLE IF NOT EXISTS Location(name STRING, PRIMARY KEY (name));",
-  "CREATE NODE TABLE IF NOT EXISTS Event(name STRING, PRIMARY KEY (name));",
-]
-
-# Create the relationships
-REL_CREATES = [
-  "CREATE REL TABLE IF NOT EXISTS WORKS_AT(FROM Person TO Organization);",
-  "CREATE REL TABLE IF NOT EXISTS LIVES_IN(FROM Person TO Location);",
-  "CREATE REL TABLE IF NOT EXISTS OWNS(FROM Person TO Pet);",
-  "CREATE REL TABLE IF NOT EXISTS FRIENDS_WITH(FROM Person TO Person);",
-  "CREATE REL TABLE IF NOT EXISTS RELATED_TO(FROM Person TO Person);",
-  "CREATE REL TABLE IF NOT EXISTS GRADUATED_FROM(FROM Person TO Organization);",
-  "CREATE REL TABLE IF NOT EXISTS ATTENDED(FROM Person TO Event);",
-]
-
-# Run the setup queries
-for query in NODE_CREATES + REL_CREATES:
-    conn.execute(query)
 
 # Define the "story"
 STORY = [
@@ -69,23 +46,28 @@ tools: list[ChatCompletionToolParam] = [
   {
     "type": "function",
     "function": {
-      "name": "run_queries",
+      "name": "run_query",
       "parameters": {
         "type": "object",
         "properties": {
-          "queries": {
-            "type": "array",
-            "items": {
-              "type": "string",
-            },
+          "query": {
+            "type": "string",
           },
         },
       },
     },
   },
+  {
+    "type": "function",
+    "function": {
+      "name": "next_line",
+      "parameters": {},
+    },
+  },
 ]
 
 # Define the starting system prompt
+line, STORY = STORY[0], STORY[1:]
 messages: list[ChatCompletionMessageParam] = [
   {
     "role": "developer",
@@ -105,6 +87,26 @@ cypher query:
 CREATE (p:Person {name: 'John Doe'});
 ```
 
+You are using "Kuzu" as the graph database. Note that you must create the node
+and relationship tables before you can create individual nodes and relationships.
+
+You can create node tables with a query like this:
+
+```
+CREATE NODE TABLE User (name STRING, age INT64 DEFAULT 0, reg_date DATE, PRIMARY KEY (name))
+```
+
+Note that the "PRIMARY KEY" is required for each node table -- and it should be
+unique -- and for all nodes in the table, the primary key must be "name".
+
+You can create relationship tables with a query like this:
+
+```
+CREATE REL TABLE FOLLOWS(FROM User TO User, since DATE);
+```
+
+By convention, the relationship table should be named in all caps.
+
 If you need to create a relationship between two nodes -- say for example you
 hear "John Doe is friends with Jane Smith" -- you would run the following query:
 
@@ -121,7 +123,6 @@ a "Person" node for "John Doe", then you would first create the "Organization" n
 CREATE (o:Organization {name: 'Main St Hardware'});
 ```
 
-
 And then create the relationship, with the following query:
 
 ```
@@ -130,70 +131,51 @@ WHERE p.name = 'John Doe' AND c.name = 'Main St Hardware'
 CREATE (p)-[:WORKS_AT]->(c);
 ```
 
-Only use create statements in that format. All other query types will fail.
-Do NOT create any new node or relationship types, only use the ones that are
-provided in the database setup. Don't use the any metadata properties other
-than `name` on either nodes or relationships -- it will cause the statement
-to fail.
-
-If there's a piece of information that doesn't fit the format above, you can
-ignore it. For example, if you hear "John Doe is a software engineer", you
-can ignore the "software engineer" part and just create the node for John Doe
-(assuming you haven't already created it).
-
-For reference, the following has already been run:
+You may also query the database to get information. For example, if you want to
+find all of the friends of John Doe, you would run the following query:
 
 ```
-""" + "\n".join(NODE_CREATES + REL_CREATES) + """
+MATCH (p:Person {name: 'John Doe'})-[:FRIENDS_WITH]->(f:Person);
 ```
 
-Remember to use the correct node and relationship types. For example, if you're
-connecting a person to a company, you should use the `Person` and `Organization`
-node types, and the `WORKS_AT` relationship type. If you're connecting a person
-to another person, you should use the `Person` node type and either the
-`FRIENDS_WITH` or `RELATED_TO` relationship types. If the relationship wasn't
-already defined, you can ignore it. For example, if you hear "John Doe works
-with Jane Smith" and there isn't a `WORKS_WITH` relationship type defined (since
-that information can be inferred from the `WORKS_AT` relationship) it will
-depend what you already know. Assuming the nodes area already created, as well
-as the "WORKS_AT" relationship between John and the company, you should create
-a "WORKS_AT" relationship between Jane and the company. If you can't infer the
-necessary information, you can ignore it.
+Create sensible node and relationship types based on the information you hear.
+For example, if you hear "John Doe is friends with Jane Smith", you should
+create a `Person` node for John and Jane, and a `FRIENDS_WITH` relationship.
 
-already have John and the company where
+If you need to alter the schema, you can do so by running the following query:
 
-already know where John works, you can just create the relationship between
+```
+ALTER TABLE User ADD email STRING;
+```
 
-
-you can ignore the "works with" part and just create the
-
-You MUST include the `name` property for all nodes, since that is the primary
-key for each node type. It is required when creating a new node (and it should
-be unique). It is also required when creating a relationship between two nodes
-(as in the above example, where the `name` is used to filter the nodes).
-
-Please only run queries -- the user won't be able to respond to you.
+If you need to run a query, use the `run_query` function. Once you've made all
+the necessary changes based on the input (schema changes, node creation, relationship
+creation), you can call the `next_line` function to move on to the next line
+of the story.
 """
         ),
       },
     ],
   },
+  {
+    "role": "developer",
+    "content": [
+      {
+        "type": "text",
+        "text": line,
+      },
+    ],
+  }
 ]
 
 # Start running!
-for i, line in enumerate(STORY):
-    # Add the line to the messages
-    print("Processing line", i, "::", line)
-    messages.append({
-        "role": "developer",
-        "content": [
-            {
-                "type": "text",
-                "text": line,
-            },
-        ],
-    })
-    
+i = 0
+while len(STORY) > 0:
+    i += 1
+    if i > 50:
+        print(f"Stopping after 50 iterations. There are {len(STORY)} lines left.")
+        break
+
     # Run the completion
     completion = client.chat.completions.create(
         model="gpt-4o",
@@ -209,25 +191,56 @@ for i, line in enumerate(STORY):
         print("No tool calls found. Stopping. Message:")
         print(msg)
         break
+
     for j, tc in enumerate(msg.tool_calls):
-        # if tc.function.name is not "run_queries":
-        #     print("Unexpected function call. Stopping. Function call:", tc.function)
-        #     break
-        args = json.loads(tc.function.arguments)
-        queries = args["queries"]
-        for k, query in enumerate(queries):
-            print(f"> {i}.{j}.{k}", "::", query)
-            conn.execute(query)
+        # print(f"> {i}.{j}", "::", tc.function)
         
-        # Add a message that the query was executed
-        messages.append({
-            "role": "developer",
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Successfully executed queries: {json.dumps(queries)}",
-                },
-            ],
-        })
+        if tc.function.name == "next_line":
+            line, STORY = STORY[0], STORY[1:]
+            messages.append({
+              "role": "developer",
+              "content": [{
+                "type": "text",
+                "text": "Next Line:\n\n" + line,
+              }],
+            })
+
+
+        elif tc.function.name == "run_query":
+            # Get the query
+            args = json.loads(tc.function.arguments)
+            if "query" not in args:
+                print("No query found. Skipping. Args:", args)
+                continue
+            query = args["query"]
+            print(f"> {i}.{j}", "::", query)
+
+            # Run the query
+            try:
+                res = conn.execute(query)
+            except Exception as e:
+                out = "ERROR: " + str(e)
+                print("<", out)
+            else:
+                # Get the result
+                res = res if isinstance(res, list) else [res]
+                out = []
+                for r in res:
+                    out = []
+                    while r.has_next():
+                        out.append(r.get_next())
+            
+            # Add a message that the query was executed
+            messages.append({
+              "role": "developer",
+              "content": [{
+                "type": "text",
+                "text": "Result:\n\n" + json.dumps(out, indent=2),
+              }],
+            })
+
+        else:
+            print("Unknown function:", tc.function)
+            raise ValueError("Unknown function")
 print("Done.")
 
